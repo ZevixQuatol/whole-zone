@@ -53,6 +53,12 @@ HuanYu 是一个以概念关系而不是熟人关系为中心的沟通平台。�
 ### 2.4 开发约束
 
 - 代码和简介允许适量缩写，但不能牺牲可理解性。
+- 开发涉及到的变量定义、文件名、数据库表名和字段名应尽量简洁，在不丢失业务含义的前提下删除重复上下文。
+- 简洁不等于晦涩：除短循环、闭包或明确数学公式外，不使用无业务含义的单字母名，也不使用 `pt`、`dom`、`cnt` 等需要猜测的缩写。
+- 模块目录已经表达的上下文不在文件名中重复。例如 `server/internal/point/service.go`、`repo.go`、`model.go`，不命名为 `point_service.go`、`point_repository.go`。
+- Go 使用符合语言习惯的简短名称和 `ID`、`URL` 等标准首字母缩写；TypeScript 使用 `camelCase` 变量、`PascalCase` 类型和简洁的 `kebab-case` 文件名。
+- PostgreSQL 使用简洁的 `snake_case`：主键统一为 `id`，外键为 `<entity>_id`，时间字段为 `created_at`、`updated_at`，类型字段优先使用 `origin`、`authority` 等直接业务名。
+- API JSON 字段统一使用 `camelCase`，由 OpenAPI 契约固定映射，前后端不各自发明别名。
 - 关键业务规则、权重算法、异常边界和非显然逻辑必须有解释性注释。
 - 模块职责和依赖方向必须清晰。
 - 以最终功能点能否完整运行和验收作为主要判断标准。
@@ -110,7 +116,7 @@ HuanYu 是一个以概念关系而不是熟人关系为中心的沟通平台。�
 
 ### 4.2 产生方式
 
-寰点通过 `origin_type` 记录怎样进入寰：
+寰点通过 `origin` 记录怎样进入寰：
 
 | 值 | 含义 |
 |---|---|
@@ -123,7 +129,7 @@ HuanYu 是一个以概念关系而不是熟人关系为中心的沟通平台。�
 
 ### 4.3 权威属性
 
-寰点通过独立的 `authority_type` 记录当前依据：
+寰点通过独立的 `authority` 记录当前依据：
 
 | 值 | 含义 |
 |---|---|
@@ -132,7 +138,7 @@ HuanYu 是一个以概念关系而不是熟人关系为中心的沟通平台。�
 | `PUBLIC_STANDARD` | 来自公共标准或广泛共识的知识体系 |
 | `EXTERNAL_AUTHORITY` | 来自可明确追溯的外部权威机构 |
 
-权威属性历史保存在 `point_authority_records`，至少记录来源机构、来源名称、来源链接或外部标识、有效时间、确认人、确认时间、当前状态和变更原因。
+权威属性历史保存在 `point_authorities`，至少记录来源机构、来源名称、来源链接或外部标识、有效时间、确认人、确认时间、当前状态和变更原因。
 
 系统预设不自动等于客观认证。权威属性也不证明某个用户具备相应能力。
 
@@ -451,19 +457,19 @@ HuanYu/
 | 实体 | 说明 |
 |---|---|
 | `users` | 账号和公开资料 |
-| `huan_points` | 规范寰点、产生方式、当前权威投影和向量 |
+| `points` | 规范寰点、产生方式、当前权威投影和向量 |
 | `point_aliases` | 别名、旧名称和归一关系 |
-| `point_authority_records` | 权威属性历史和依据 |
-| `user_point_bindings` | 用户主动绑定关系，初始个人权重为 0 |
+| `point_authorities` | 权威属性历史和依据 |
+| `user_points` | 用户主动绑定关系，初始个人权重为 0 |
 | `domains` | 域名称、描述和创建关联 |
-| `domain_seed_points` | 域创建时的种子寰点 |
+| `domain_seeds` | 域创建时的种子寰点 |
 | `domain_members` | 公开域成员关系 |
 | `contents` | 当前内容记录和所属语境 |
 | `content_revisions` | 内容版本历史 |
 | `content_points` | 发布者确认的内容寰点 |
-| `content_evaluations` | 针对内容版本和具体寰点的评价 |
+| `evaluations` | 针对内容版本和具体寰点的评价 |
 | `system_notifications` | 权重处理、评价结果和系统操作的最小站内通知，由 Account 模块拥有 |
-| `outbox_events` | 与业务事务原子提交的异步事件 |
+| `outbox` | 与业务事务原子提交的异步事件 |
 | `weight_evidence` | 不可变三值证据账本 |
 | `user_point_weights` | 用户—寰点投影 |
 | `domain_point_weights` | 域—寰点投影 |
@@ -471,7 +477,7 @@ HuanYu/
 | `weight_palettes` | 共享色谱 |
 | `weight_schemes` | 三种场景的配置方案 |
 | `weight_levels` | 场景等级、说明、区间和色谱位置 |
-| `weight_decay_policies` | 衰减和证据类型系数版本 |
+| `decay_policies` | 衰减和证据类型系数版本 |
 
 ## 10. 桌面端信息架构
 

@@ -17,12 +17,16 @@ func main() {
 	if len(os.Args) != 2 || os.Args[1] != "bootstrap" {
 		log.Fatal("usage: go run ./cmd/admin bootstrap")
 	}
-	password := os.Getenv("ADMIN_PASSWORD")
+	cfg, err := config.Load(config.Path(os.Getenv))
+	if err != nil {
+		log.Fatalf("load config: %v", err)
+	}
+	password := cfg.Admin.Password
 	email, handle, displayName, err := account.NormalizeRegistration(account.RegisterInput{
-		Email:       os.Getenv("ADMIN_EMAIL"),
-		Handle:      os.Getenv("ADMIN_HANDLE"),
+		Email:       cfg.Admin.Email,
+		Handle:      cfg.Admin.Handle,
 		Password:    password,
-		DisplayName: os.Getenv("ADMIN_DISPLAY_NAME"),
+		DisplayName: cfg.Admin.DisplayName,
 	})
 	if err != nil {
 		log.Fatalf("validate admin account: %v", err)
@@ -30,10 +34,6 @@ func main() {
 	hash, err := account.HashPassword(password)
 	if err != nil {
 		log.Fatalf("hash password: %v", err)
-	}
-	cfg, err := config.Load(os.Getenv)
-	if err != nil {
-		log.Fatalf("load config: %v", err)
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()

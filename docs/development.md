@@ -9,28 +9,29 @@
 
 项目使用 PostgreSQL 18 和 Redis。服务可以由外部 Docker Compose 管理；项目代码不依赖或修改共享 Compose 目录。
 
-复制示例配置：
+后端统一读取 YAML。首次使用时复制示例文件：
 
 ```powershell
-Copy-Item api/.env.example api/.env
+Copy-Item api/config.example.yml api/config.yml
 Copy-Item app/.env.local.example app/.env.local
 ```
 
-把 `DATABASE_URL`、`REDIS_URL` 和 SMTP 参数改为本机实际值。不要提交真实密码。
+编辑 `api/config.yml`，填写 PostgreSQL、Redis、SMTP 和管理员账号。该文件已被 Git 忽略，不会提交真实密码；可提交的字段模板保留在 `api/config.example.yml`。
 
-SMTP 未配置或发送失败时，找回密码接口仍会返回统一结果，具体错误会写入 API 日志，避免泄露账号是否存在。要实际收到重置邮件，必须正确配置 `SMTP_HOST`、`SMTP_PORT` 和发件人信息。
+API 和管理员命令默认读取当前 `api` 目录下的 `config.yml`。需要使用其他文件时，只设置一个路径变量即可：
+
+```powershell
+$env:HUANYU_CONFIG = 'D:\Config\huanyu.yml'
+```
+
+SMTP 的 `host` 留空或发送失败时，找回密码接口仍会返回统一结果，具体错误会写入 API 日志，避免泄露账号是否存在。要实际收到重置邮件，需要正确填写 `smtp` 配置。
 
 ## 初始化管理员
 
-在 PowerShell 中设置管理员环境变量后执行：
+先在 `config.yml` 的 `admin` 节点填写管理员账号，然后直接执行：
 
 ```powershell
 Set-Location api
-$env:DATABASE_URL = 'postgres://postgres:password@localhost:5432/huanyu?sslmode=disable'
-$env:ADMIN_EMAIL = 'admin@example.com'
-$env:ADMIN_HANDLE = 'admin'
-$env:ADMIN_PASSWORD = 'replace-with-a-strong-password'
-$env:ADMIN_DISPLAY_NAME = '平台管理员'
 go run ./cmd/admin bootstrap
 ```
 
@@ -40,7 +41,6 @@ go run ./cmd/admin bootstrap
 
 ```powershell
 Set-Location api
-$env:DATABASE_URL = 'postgres://postgres:password@localhost:5432/huanyu?sslmode=disable'
 go run ./cmd/api
 ```
 

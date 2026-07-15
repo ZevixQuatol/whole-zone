@@ -1,0 +1,33 @@
+# 服务与前端地址
+server:
+  addr: ":8080"
+  app_url: "http://localhost:3000"
+
+# PostgreSQL 和 Redis
+database:
+  url: "postgres://postgres:change-me@localhost:5432/huanyu?sslmode=disable"
+redis:
+  url: "redis://:change-me@localhost:6379/0"
+
+# 登录会话
+cookie:
+  name: "hy_session"
+  secure: false
+account:
+  session_ttl: "720h"
+  reset_ttl: "30m"
+
+# 留空 host 会禁用邮件发送
+smtp:
+  host: ""
+  port: "587"
+  user: ""
+  password: ""
+  from: "no-reply@huanyu.local"
+
+# go run ./cmd/admin bootstrap 使用此账号
+admin:
+  email: "admin@example.com"
+  handle: "admin"
+  password: ""
+  display_name: "平台管理员"

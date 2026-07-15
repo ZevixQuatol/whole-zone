@@ -15,7 +15,7 @@ import (
 )
 
 func main() {
-	cfg, err := config.Load(os.Getenv)
+	cfg, err := config.Load(config.Path(os.Getenv))
 	if err != nil {
 		log.Fatalf("load config: %v", err)
 	}

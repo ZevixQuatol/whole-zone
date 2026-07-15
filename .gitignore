@@ -5,6 +5,7 @@
 .env.*
 !.env.example
 !.env.local.example
+api/config.yml
 
 # Go
 api/bin/

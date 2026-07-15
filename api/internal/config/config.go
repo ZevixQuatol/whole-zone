@@ -3,14 +3,20 @@ package config
 import (
 	"errors"
 	"fmt"
-	"strconv"
+	"os"
+	"strings"
 	"time"
+
+	"github.com/goccy/go-yaml"
 )
+
+const DefaultPath = "config.yml"
 
 type Config struct {
 	Addr         string
 	AppURL       string
 	DatabaseURL  string
+	RedisURL     string
 	CookieName   string
 	SecureCookie bool
 	SessionTTL   time.Duration
@@ -20,60 +26,125 @@ type Config struct {
 	SMTPUser     string
 	SMTPPassword string
 	SMTPFrom     string
+	Admin        Admin
 }
 
-func Load(getenv func(string) string) (Config, error) {
-	databaseURL := getenv("DATABASE_URL")
-	if databaseURL == "" {
-		return Config{}, errors.New("DATABASE_URL is required")
+type Admin struct {
+	Email       string
+	Handle      string
+	Password    string
+	DisplayName string
+}
+
+type fileConfig struct {
+	Server struct {
+		Addr   string `yaml:"addr"`
+		AppURL string `yaml:"app_url"`
+	} `yaml:"server"`
+	Database struct {
+		URL string `yaml:"url"`
+	} `yaml:"database"`
+	Redis struct {
+		URL string `yaml:"url"`
+	} `yaml:"redis"`
+	Cookie struct {
+		Name   string `yaml:"name"`
+		Secure bool   `yaml:"secure"`
+	} `yaml:"cookie"`
+	Account struct {
+		SessionTTL string `yaml:"session_ttl"`
+		ResetTTL   string `yaml:"reset_ttl"`
+	} `yaml:"account"`
+	SMTP struct {
+		Host     string `yaml:"host"`
+		Port     string `yaml:"port"`
+		User     string `yaml:"user"`
+		Password string `yaml:"password"`
+		From     string `yaml:"from"`
+	} `yaml:"smtp"`
+	Admin struct {
+		Email       string `yaml:"email"`
+		Handle      string `yaml:"handle"`
+		Password    string `yaml:"password"`
+		DisplayName string `yaml:"display_name"`
+	} `yaml:"admin"`
+}
+
+// Path returns the default YAML path while allowing tests and deployments to select another file.
+func Path(getenv func(string) string) string {
+	if path := strings.TrimSpace(getenv("HUANYU_CONFIG")); path != "" {
+		return path
+	}
+	return DefaultPath
+}
+
+func Load(path string) (Config, error) {
+	content, err := os.ReadFile(path)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return Config{}, fmt.Errorf("配置文件 %s 不存在，请先复制 config.example.yml", path)
+		}
+		return Config{}, fmt.Errorf("读取配置文件 %s: %w", path, err)
 	}
 
-	secure, err := boolValue(getenv("COOKIE_SECURE"), false)
-	if err != nil {
-		return Config{}, fmt.Errorf("COOKIE_SECURE: %w", err)
+	var file fileConfig
+	if err := yaml.Unmarshal(content, &file); err != nil {
+		return Config{}, fmt.Errorf("解析配置文件 %s: %w", path, err)
 	}
-	sessionTTL, err := durationValue(getenv("SESSION_TTL"), 30*24*time.Hour)
+
+	sessionTTL, err := duration(file.Account.SessionTTL, 30*24*time.Hour)
 	if err != nil {
-		return Config{}, fmt.Errorf("SESSION_TTL: %w", err)
+		return Config{}, fmt.Errorf("account.session_ttl: %w", err)
 	}
-	resetTTL, err := durationValue(getenv("RESET_TTL"), 30*time.Minute)
+	resetTTL, err := duration(file.Account.ResetTTL, 30*time.Minute)
 	if err != nil {
-		return Config{}, fmt.Errorf("RESET_TTL: %w", err)
+		return Config{}, fmt.Errorf("account.reset_ttl: %w", err)
+	}
+	databaseURL := strings.TrimSpace(file.Database.URL)
+	if databaseURL == "" {
+		return Config{}, errors.New("database.url 不能为空")
 	}
 
 	return Config{
-		Addr:         value(getenv("HTTP_ADDR"), ":8080"),
-		AppURL:       value(getenv("APP_URL"), "http://localhost:3000"),
+		Addr:         fallback(file.Server.Addr, ":8080"),
+		AppURL:       fallback(file.Server.AppURL, "http://localhost:3000"),
 		DatabaseURL:  databaseURL,
-		CookieName:   value(getenv("COOKIE_NAME"), "hy_session"),
-		SecureCookie: secure,
+		RedisURL:     strings.TrimSpace(file.Redis.URL),
+		CookieName:   fallback(file.Cookie.Name, "hy_session"),
+		SecureCookie: file.Cookie.Secure,
 		SessionTTL:   sessionTTL,
 		ResetTTL:     resetTTL,
-		SMTPHost:     getenv("SMTP_HOST"),
-		SMTPPort:     value(getenv("SMTP_PORT"), "587"),
-		SMTPUser:     getenv("SMTP_USER"),
-		SMTPPassword: getenv("SMTP_PASSWORD"),
-		SMTPFrom:     value(getenv("SMTP_FROM"), "no-reply@huanyu.local"),
+		SMTPHost:     strings.TrimSpace(file.SMTP.Host),
+		SMTPPort:     fallback(file.SMTP.Port, "587"),
+		SMTPUser:     strings.TrimSpace(file.SMTP.User),
+		SMTPPassword: file.SMTP.Password,
+		SMTPFrom:     fallback(file.SMTP.From, "no-reply@huanyu.local"),
+		Admin: Admin{
+			Email:       strings.TrimSpace(file.Admin.Email),
+			Handle:      strings.TrimSpace(file.Admin.Handle),
+			Password:    file.Admin.Password,
+			DisplayName: strings.TrimSpace(file.Admin.DisplayName),
+		},
 	}, nil
 }
 
-func value(current, fallback string) string {
-	if current == "" {
-		return fallback
+func fallback(current, defaultValue string) string {
+	if current = strings.TrimSpace(current); current != "" {
+		return current
 	}
-	return current
+	return defaultValue
 }
 
-func boolValue(current string, fallback bool) (bool, error) {
-	if current == "" {
-		return fallback, nil
+func duration(current string, defaultValue time.Duration) (time.Duration, error) {
+	if current = strings.TrimSpace(current); current == "" {
+		return defaultValue, nil
 	}
-	return strconv.ParseBool(current)
-}
-
-func durationValue(current string, fallback time.Duration) (time.Duration, error) {
-	if current == "" {
-		return fallback, nil
+	value, err := time.ParseDuration(current)
+	if err != nil {
+		return 0, err
 	}
-	return time.ParseDuration(current)
+	if value <= 0 {
+		return 0, errors.New("必须大于 0")
+	}
+	return value, nil
 }

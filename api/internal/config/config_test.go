@@ -1,100 +1,110 @@
 package config
 
 import (
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
 
+func TestLoadRequiresConfigFile(t *testing.T) {
+	_, err := Load(filepath.Join(t.TempDir(), "missing.yml"))
+	if err == nil || !strings.Contains(err.Error(), "config.example.yml") {
+		t.Fatalf("error = %v, want missing-file guidance", err)
+	}
+}
+
 func TestLoadRequiresDatabaseURL(t *testing.T) {
-	_, err := Load(func(string) string { return "" })
-	if err == nil {
-		t.Fatal("expected missing DATABASE_URL to fail")
+	path := writeConfig(t, "server:\n  addr: ':8080'\n")
+	_, err := Load(path)
+	if err == nil || !strings.Contains(err.Error(), "database.url") {
+		t.Fatalf("error = %v, want database.url validation", err)
 	}
 }
 
-func TestLoadUsesDevelopmentDefaults(t *testing.T) {
-	cfg, err := Load(func(key string) string {
-		if key == "DATABASE_URL" {
-			return "postgres://localhost/huanyu"
-		}
-		return ""
-	})
-	if err != nil {
-		t.Fatalf("load config: %v", err)
-	}
-
-	if cfg.Addr != ":8080" {
-		t.Fatalf("Addr = %q, want :8080", cfg.Addr)
-	}
-	if cfg.AppURL != "http://localhost:3000" {
-		t.Fatalf("AppURL = %q, want http://localhost:3000", cfg.AppURL)
-	}
-	if cfg.SecureCookie {
-		t.Fatal("SecureCookie = true, want false")
-	}
-	if cfg.SessionTTL != 30*24*time.Hour {
-		t.Fatalf("SessionTTL = %s, want 720h", cfg.SessionTTL)
-	}
-	if cfg.ResetTTL != 30*time.Minute {
-		t.Fatalf("ResetTTL = %s, want 30m", cfg.ResetTTL)
-	}
-	if cfg.CookieName != "hy_session" {
-		t.Fatalf("CookieName = %q, want hy_session", cfg.CookieName)
+func TestLoadRejectsMalformedYAML(t *testing.T) {
+	path := writeConfig(t, "server:\n  addr: [\n")
+	if _, err := Load(path); err == nil || !strings.Contains(err.Error(), "解析配置文件") {
+		t.Fatalf("error = %v, want YAML parse error", err)
 	}
 }
 
-func TestLoadReadsOverrides(t *testing.T) {
-	env := map[string]string{
-		"DATABASE_URL":  "postgres://localhost/huanyu",
-		"HTTP_ADDR":     ":9090",
-		"APP_URL":       "https://huanyu.example",
-		"COOKIE_NAME":   "session",
-		"COOKIE_SECURE": "true",
-		"SESSION_TTL":   "48h",
-		"RESET_TTL":     "15m",
-	}
+func TestLoadUsesYAMLValuesAndDefaults(t *testing.T) {
+	path := writeConfig(t, `
+server:
+  addr: ":9090"
+  app_url: https://huanyu.example
+database:
+  url: postgres://localhost/huanyu
+redis:
+  url: redis://localhost:6379/0
+cookie:
+  name: session
+  secure: true
+account:
+  session_ttl: 48h
+  reset_ttl: 15m
+smtp:
+  host: smtp.example.com
+  user: mailer
+  password: mail-password
+admin:
+  email: admin@example.com
+  handle: admin
+  password: long-admin-password
+  display_name: 平台管理员
+`)
 
-	cfg, err := Load(func(key string) string { return env[key] })
+	cfg, err := Load(path)
 	if err != nil {
 		t.Fatalf("load config: %v", err)
 	}
-
 	if cfg.Addr != ":9090" || cfg.AppURL != "https://huanyu.example" {
-		t.Fatalf("unexpected address overrides: %+v", cfg)
+		t.Fatalf("unexpected server config: %+v", cfg)
+	}
+	if cfg.DatabaseURL != "postgres://localhost/huanyu" || cfg.RedisURL != "redis://localhost:6379/0" {
+		t.Fatalf("unexpected service config: %+v", cfg)
 	}
 	if cfg.CookieName != "session" || !cfg.SecureCookie {
-		t.Fatalf("unexpected cookie overrides: %+v", cfg)
+		t.Fatalf("unexpected cookie config: %+v", cfg)
 	}
 	if cfg.SessionTTL != 48*time.Hour || cfg.ResetTTL != 15*time.Minute {
-		t.Fatalf("unexpected duration overrides: %+v", cfg)
+		t.Fatalf("unexpected account duration: %+v", cfg)
+	}
+	if cfg.SMTPPort != "587" || cfg.SMTPFrom != "no-reply@huanyu.local" {
+		t.Fatalf("smtp defaults were not applied: %+v", cfg)
+	}
+	if cfg.Admin.Email != "admin@example.com" || cfg.Admin.DisplayName != "平台管理员" {
+		t.Fatalf("unexpected admin config: %+v", cfg.Admin)
 	}
 }
 
-func TestLoadRejectsInvalidOverrides(t *testing.T) {
-	tests := []struct {
-		name  string
-		key   string
-		value string
-	}{
-		{name: "secure cookie", key: "COOKIE_SECURE", value: "sometimes"},
-		{name: "session ttl", key: "SESSION_TTL", value: "tomorrow"},
-		{name: "reset ttl", key: "RESET_TTL", value: "soon"},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			_, err := Load(func(key string) string {
-				if key == "DATABASE_URL" {
-					return "postgres://localhost/huanyu"
-				}
-				if key == tt.key {
-					return tt.value
-				}
-				return ""
-			})
-			if err == nil {
-				t.Fatalf("expected %s to reject %q", tt.key, tt.value)
+func TestLoadRejectsInvalidDurations(t *testing.T) {
+	for _, value := range []string{"tomorrow", "0s", "-1h"} {
+		t.Run(value, func(t *testing.T) {
+			path := writeConfig(t, "database:\n  url: postgres://localhost/huanyu\naccount:\n  session_ttl: \""+value+"\"\n")
+			if _, err := Load(path); err == nil {
+				t.Fatalf("expected duration %q to fail", value)
 			}
 		})
 	}
+}
+
+func TestPathUsesOptionalOverride(t *testing.T) {
+	if path := Path(func(string) string { return "" }); path != DefaultPath {
+		t.Fatalf("path = %q, want %q", path, DefaultPath)
+	}
+	if path := Path(func(string) string { return " D:/config/huanyu.yml " }); path != "D:/config/huanyu.yml" {
+		t.Fatalf("override path = %q", path)
+	}
+}
+
+func writeConfig(t *testing.T, content string) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "config.yml")
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+	return path
 }

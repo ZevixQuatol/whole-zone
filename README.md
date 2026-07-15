@@ -11,3 +11,12 @@
 - `docs/`：产品规格、实施计划和开发说明。
 
 详细启动与验证步骤见 [docs/development.md](docs/development.md)。
+
+后端首次配置后可直接启动：
+
+```powershell
+Copy-Item api/config.example.yml api/config.yml
+# 编辑 api/config.yml
+Set-Location api
+go run ./cmd/api
+```

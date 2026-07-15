@@ -1,0 +1,234 @@
+openapi: 3.1.0
+info:
+  title: HuanYu Account API
+  version: 0.1.0
+servers:
+  - url: /api/v1
+paths:
+  /account/register:
+    post:
+      operationId: register
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/RegisterInput' } } } }
+      responses:
+        '201': { description: Registered, content: { application/json: { schema: { $ref: '#/components/schemas/UserResult' } } } }
+        '422': { $ref: '#/components/responses/Error' }
+  /account/login:
+    post:
+      operationId: login
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/LoginInput' } } } }
+      responses:
+        '200': { description: Logged in, content: { application/json: { schema: { $ref: '#/components/schemas/UserResult' } } } }
+        '401': { $ref: '#/components/responses/Error' }
+  /account/me:
+    get:
+      operationId: me
+      security: [{ session: [] }]
+      responses:
+        '200': { description: Current account, content: { application/json: { schema: { $ref: '#/components/schemas/MeResult' } } } }
+        '401': { $ref: '#/components/responses/Error' }
+  /account/profile:
+    patch:
+      operationId: updateProfile
+      security: [{ session: [], csrf: [] }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/ProfileInput' } } } }
+      responses:
+        '200': { description: Updated, content: { application/json: { schema: { $ref: '#/components/schemas/UserResult' } } } }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '422': { $ref: '#/components/responses/Error' }
+  /account/logout:
+    post:
+      operationId: logout
+      security: [{ session: [], csrf: [] }]
+      responses: { '204': { description: Logged out }, '401': { $ref: '#/components/responses/Error' }, '403': { $ref: '#/components/responses/Error' } }
+  /account/logout-all:
+    post:
+      operationId: logoutAll
+      security: [{ session: [], csrf: [] }]
+      responses: { '204': { description: All sessions revoked }, '401': { $ref: '#/components/responses/Error' }, '403': { $ref: '#/components/responses/Error' } }
+  /account/password/change:
+    post:
+      operationId: changePassword
+      security: [{ session: [], csrf: [] }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/ChangePasswordInput' } } } }
+      responses: { '204': { description: Password changed }, '401': { $ref: '#/components/responses/Error' }, '403': { $ref: '#/components/responses/Error' }, '422': { $ref: '#/components/responses/Error' } }
+  /account/password/forgot:
+    post:
+      operationId: forgotPassword
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email: { type: string, format: email }
+      responses: { '204': { description: Generic accepted response } }
+  /account/password/reset:
+    post:
+      operationId: resetPassword
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token, password]
+              properties:
+                token: { type: string }
+                password: { type: string, minLength: 12, maxLength: 128 }
+      responses: { '204': { description: Password reset }, '422': { $ref: '#/components/responses/Error' } }
+  /account/notifications:
+    get:
+      operationId: listNotifications
+      security: [{ session: [] }]
+      responses:
+        '200': { description: Notifications, content: { application/json: { schema: { $ref: '#/components/schemas/NotificationList' } } } }
+        '401': { $ref: '#/components/responses/Error' }
+  '/account/notifications/{id}/read':
+    patch:
+      operationId: readNotification
+      security: [{ session: [], csrf: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses: { '204': { description: Marked read }, '401': { $ref: '#/components/responses/Error' }, '403': { $ref: '#/components/responses/Error' }, '404': { $ref: '#/components/responses/Error' } }
+  '/users/{handle}':
+    get:
+      operationId: publicUser
+      parameters: [{ name: handle, in: path, required: true, schema: { type: string } }]
+      responses:
+        '200': { description: Public account, content: { application/json: { schema: { $ref: '#/components/schemas/UserResult' } } } }
+        '404': { $ref: '#/components/responses/Error' }
+  /admin/invites:
+    get:
+      operationId: listInvites
+      security: [{ session: [] }]
+      responses:
+        '200': { description: Invites, content: { application/json: { schema: { $ref: '#/components/schemas/InviteList' } } } }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+    post:
+      operationId: createInvite
+      security: [{ session: [], csrf: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [maxUses, ttlDays]
+              properties:
+                maxUses: { type: integer, minimum: 1, maximum: 1000 }
+                ttlDays: { type: integer, minimum: 1, maximum: 365 }
+      responses:
+        '201': { description: Invite created, content: { application/json: { schema: { $ref: '#/components/schemas/InviteCreated' } } } }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '422': { $ref: '#/components/responses/Error' }
+  '/admin/invites/{id}/disable':
+    post:
+      operationId: disableInvite
+      security: [{ session: [], csrf: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses: { '204': { description: Invite disabled }, '401': { $ref: '#/components/responses/Error' }, '403': { $ref: '#/components/responses/Error' }, '404': { $ref: '#/components/responses/Error' } }
+components:
+  securitySchemes:
+    session: { type: apiKey, in: cookie, name: hy_session }
+    csrf: { type: apiKey, in: header, name: X-CSRF-Token }
+  responses:
+    Error:
+      description: Account error
+      content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+  schemas:
+    RegisterInput:
+      type: object
+      required: [inviteCode, email, handle, password, displayName]
+      properties:
+        inviteCode: { type: string }
+        email: { type: string, format: email }
+        handle: { type: string, pattern: '^[a-zA-Z0-9_]{3,32}$' }
+        password: { type: string, minLength: 12, maxLength: 128 }
+        displayName: { type: string, minLength: 1, maxLength: 64 }
+    LoginInput:
+      type: object
+      required: [login, password]
+      properties: { login: { type: string }, password: { type: string } }
+    ProfileInput:
+      type: object
+      required: [displayName, bio, location]
+      properties:
+        displayName: { type: string, minLength: 1, maxLength: 64 }
+        bio: { type: string, maxLength: 500 }
+        location: { type: string, maxLength: 80 }
+    ChangePasswordInput:
+      type: object
+      required: [currentPassword, newPassword]
+      properties:
+        currentPassword: { type: string }
+        newPassword: { type: string, minLength: 12, maxLength: 128 }
+    PublicUser:
+      type: object
+      required: [handle, displayName, bio, location, createdAt]
+      properties:
+        handle: { type: string }
+        displayName: { type: string }
+        bio: { type: string }
+        location: { type: string }
+        createdAt: { type: string, format: date-time }
+    UserResult:
+      type: object
+      required: [user]
+      properties: { user: { $ref: '#/components/schemas/PublicUser' } }
+    MeResult:
+      allOf:
+        - { $ref: '#/components/schemas/UserResult' }
+        - type: object
+          required: [role]
+          properties:
+            role: { type: string, enum: [member, platform_admin] }
+    Notification:
+      type: object
+      required: [id, kind, title, body, data, createdAt]
+      properties:
+        id: { type: string, format: uuid }
+        kind: { type: string }
+        title: { type: string }
+        body: { type: string }
+        data: { type: object, additionalProperties: true }
+        readAt: { type: [string, 'null'], format: date-time }
+        createdAt: { type: string, format: date-time }
+    NotificationList:
+      type: object
+      required: [items]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/Notification' } }
+    Invite:
+      type: object
+      required: [id, maxUses, uses, expiresAt, createdAt]
+      properties:
+        id: { type: string, format: uuid }
+        maxUses: { type: integer }
+        uses: { type: integer }
+        expiresAt: { type: string, format: date-time }
+        disabledAt: { type: [string, 'null'], format: date-time }
+        createdAt: { type: string, format: date-time }
+    InviteList:
+      type: object
+      required: [items]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/Invite' } }
+    InviteCreated:
+      type: object
+      required: [invite, code]
+      properties:
+        invite: { $ref: '#/components/schemas/Invite' }
+        code: { type: string }
+    Error:
+      type: object
+      required: [code, message, retryable]
+      properties:
+        code: { type: string }
+        message: { type: string }
+        fieldErrors: { type: object, additionalProperties: { type: array, items: { type: string } } }
+        retryable: { type: boolean }
+        traceId: { type: string }

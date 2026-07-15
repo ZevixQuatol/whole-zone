@@ -1,0 +1,28 @@
+.superpowers/
+
+# Local environment
+.env
+.env.*
+!.env.example
+!.env.local.example
+
+# Go
+api/bin/
+api/coverage.out
+*.test
+
+# Next.js
+app/node_modules/
+app/.next/
+app/out/
+app/coverage/
+app/playwright-report/
+app/test-results/
+app/.turbo/
+app/*.tsbuildinfo
+
+# Editors and OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db

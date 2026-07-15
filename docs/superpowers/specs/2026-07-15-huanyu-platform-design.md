@@ -41,8 +41,10 @@ HuanYu 是一个以概念关系而不是熟人关系为中心的沟通平台。�
 ### 2.3 技术约束
 
 - 客户端：React + Next.js + TypeScript。
+- 客户端代码位于项目根目录 `app/`。
 - 客户端只支持桌面端，不承担移动端响应式适配要求。
 - 服务端：Go + Gin。
+- 服务端代码位于项目根目录 `api/`。
 - 主数据库：PostgreSQL。
 - 向量存储与召回：PostgreSQL + pgvector。
 - 缓存、限流和任务唤醒：Redis。
@@ -55,7 +57,7 @@ HuanYu 是一个以概念关系而不是熟人关系为中心的沟通平台。�
 - 代码和简介允许适量缩写，但不能牺牲可理解性。
 - 开发涉及到的变量定义、文件名、数据库表名和字段名应尽量简洁，在不丢失业务含义的前提下删除重复上下文。
 - 简洁不等于晦涩：除短循环、闭包或明确数学公式外，不使用无业务含义的单字母名，也不使用 `pt`、`dom`、`cnt` 等需要猜测的缩写。
-- 模块目录已经表达的上下文不在文件名中重复。例如 `server/internal/point/service.go`、`repo.go`、`model.go`，不命名为 `point_service.go`、`point_repository.go`。
+- 模块目录已经表达的上下文不在文件名中重复。例如 `api/internal/point/service.go`、`repo.go`、`model.go`，不命名为 `point_service.go`、`point_repository.go`。
 - Go 使用符合语言习惯的简短名称和 `ID`、`URL` 等标准首字母缩写；TypeScript 使用 `camelCase` 变量、`PascalCase` 类型和简洁的 `kebab-case` 文件名。
 - PostgreSQL 使用简洁的 `snake_case`：主键统一为 `id`，外键为 `<entity>_id`，时间字段为 `created_at`、`updated_at`，类型字段优先使用 `origin`、`authority` 等直接业务名。
 - API JSON 字段统一使用 `camelCase`，由 OpenAPI 契约固定映射，前后端不各自发明别名。
@@ -434,8 +436,8 @@ Redis 只用于缓存、限流、任务唤醒和短期状态。Redis 清空后�
 
 ```text
 HuanYu/
-├── web/
-├── server/
+├── app/
+├── api/
 │   ├── cmd/
 │   │   ├── api/
 │   │   └── worker/

@@ -92,11 +92,36 @@ func TestLoadRejectsInvalidDurations(t *testing.T) {
 }
 
 func TestPathUsesOptionalOverride(t *testing.T) {
+	root := t.TempDir()
+	chdir(t, root)
 	if path := Path(func(string) string { return "" }); path != DefaultPath {
 		t.Fatalf("path = %q, want %q", path, DefaultPath)
 	}
 	if path := Path(func(string) string { return " D:/config/huanyu.yml " }); path != "D:/config/huanyu.yml" {
 		t.Fatalf("override path = %q", path)
+	}
+}
+
+func TestPathFindsConfigFromGoLandWorkingDirectories(t *testing.T) {
+	root := t.TempDir()
+	apiDir := filepath.Join(root, "api")
+	cmdDir := filepath.Join(apiDir, "cmd", "api")
+	if err := os.MkdirAll(cmdDir, 0o755); err != nil {
+		t.Fatalf("create test directories: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(apiDir, DefaultPath), []byte("database:\n  url: postgres://localhost/huanyu\n"), 0o600); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+
+	chdir(t, root)
+	if path := Path(func(string) string { return "" }); path != filepath.Join("api", DefaultPath) {
+		t.Fatalf("project-root path = %q", path)
+	}
+	if err := os.Chdir(cmdDir); err != nil {
+		t.Fatalf("change to cmd directory: %v", err)
+	}
+	if path := Path(func(string) string { return "" }); path != filepath.Join("..", "..", DefaultPath) {
+		t.Fatalf("cmd path = %q", path)
 	}
 }
 
@@ -107,4 +132,16 @@ func writeConfig(t *testing.T, content string) string {
 		t.Fatalf("write config: %v", err)
 	}
 	return path
+}
+
+func chdir(t *testing.T, path string) {
+	t.Helper()
+	current, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("get working directory: %v", err)
+	}
+	if err := os.Chdir(path); err != nil {
+		t.Fatalf("change working directory: %v", err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(current) })
 }

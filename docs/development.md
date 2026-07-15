@@ -55,6 +55,12 @@ go run ./cmd/api
 
 存活检查：`http://localhost:8080/health/live`。
 
+### GoLand 直接启动
+
+可以直接点击 `api/cmd/api/main.go` 中 `main` 函数旁的运行按钮。程序会依次在当前目录、`api/config.yml` 和 `../../config.yml` 查找配置，因此 GoLand 工作目录使用项目根目录、`api` 或 `api/cmd/api` 均可。
+
+健康检查端口以 `config.yml` 中的 `server.addr` 为准；例如配置为 `:10210` 时，地址为 `http://localhost:10210/health/live`。
+
 ## 启动桌面端
 
 ```powershell

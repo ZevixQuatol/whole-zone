@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -70,10 +71,19 @@ type fileConfig struct {
 	} `yaml:"admin"`
 }
 
-// Path returns the default YAML path while allowing tests and deployments to select another file.
+// Path 优先使用显式路径，并兼容 GoLand 从项目根目录、api 或 cmd 子目录直接启动。
 func Path(getenv func(string) string) string {
 	if path := strings.TrimSpace(getenv("HUANYU_CONFIG")); path != "" {
 		return path
+	}
+	for _, path := range []string{
+		DefaultPath,
+		filepath.Join("api", DefaultPath),
+		filepath.Join("..", "..", DefaultPath),
+	} {
+		if info, err := os.Stat(path); err == nil && !info.IsDir() {
+			return path
+		}
 	}
 	return DefaultPath
 }

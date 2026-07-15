@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"unicode"
 
 	"github.com/ZevixQuatol/whole-zone/api/internal/account"
 	"github.com/ZevixQuatol/whole-zone/api/internal/store"
@@ -45,6 +46,7 @@ func TestPostgresRegisterAndLogin(t *testing.T) {
 	if err := store.Up(ctx, pool, migrations.FS); err != nil {
 		t.Fatalf("apply migrations: %v", err)
 	}
+	assertSchemaComments(t, ctx, pool)
 
 	repo := account.NewPG(pool)
 	now := time.Date(2026, 7, 15, 12, 0, 0, 0, time.UTC)
@@ -75,5 +77,57 @@ func TestPostgresRegisterAndLogin(t *testing.T) {
 		Password: "long-enough-password", DisplayName: "第二个用户",
 	}, "integration-test"); err != account.ErrInviteInvalid {
 		t.Fatalf("second registration error = %v, want ErrInviteInvalid", err)
+	}
+}
+
+func assertSchemaComments(t *testing.T, ctx context.Context, pool *pgxpool.Pool) {
+	t.Helper()
+	tables := []string{
+		"schema_migrations", "users", "invites", "sessions",
+		"password_resets", "system_notifications", "account_events",
+	}
+	rows, err := pool.Query(ctx, `
+        SELECT c.relname, ''::text AS field, COALESCE(obj_description(c.oid, 'pg_class'), '')
+        FROM pg_class c
+        JOIN pg_namespace n ON n.oid = c.relnamespace
+        WHERE n.nspname = current_schema() AND c.relname = ANY($1::text[])
+        UNION ALL
+        SELECT c.relname, a.attname, COALESCE(col_description(c.oid, a.attnum), '')
+        FROM pg_class c
+        JOIN pg_namespace n ON n.oid = c.relnamespace
+        JOIN pg_attribute a ON a.attrelid = c.oid AND a.attnum > 0 AND NOT a.attisdropped
+        WHERE n.nspname = current_schema() AND c.relname = ANY($1::text[])
+        ORDER BY 1, 2`, tables)
+	if err != nil {
+		t.Fatalf("query schema comments: %v", err)
+	}
+	defer rows.Close()
+
+	seenTables := make(map[string]bool, len(tables))
+	for rows.Next() {
+		var table, field, comment string
+		if err := rows.Scan(&table, &field, &comment); err != nil {
+			t.Fatalf("scan schema comment: %v", err)
+		}
+		seenTables[table] = true
+		name := table
+		if field != "" {
+			name += "." + field
+		}
+		if strings.TrimSpace(comment) == "" {
+			t.Errorf("%s is missing a comment", name)
+			continue
+		}
+		if !strings.ContainsFunc(comment, func(r rune) bool { return unicode.Is(unicode.Han, r) }) {
+			t.Errorf("%s comment %q is not Chinese", name, comment)
+		}
+	}
+	if err := rows.Err(); err != nil {
+		t.Fatalf("iterate schema comments: %v", err)
+	}
+	for _, table := range tables {
+		if !seenTables[table] {
+			t.Errorf("table %s was not found", table)
+		}
 	}
 }

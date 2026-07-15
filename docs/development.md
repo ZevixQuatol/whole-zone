@@ -37,6 +37,15 @@ go run ./cmd/admin bootstrap
 
 命令会自动执行迁移，并且可以幂等重复运行。
 
+## 只执行数据库迁移
+
+API 启动时会自动迁移；如果只想更新数据库结构或注释而不启动服务，可以执行：
+
+```powershell
+Set-Location api
+go run ./cmd/migrate
+```
+
 ## 启动 API
 
 ```powershell

@@ -20,7 +20,7 @@ func TestListMigrationsRequiresOrderedPairs(t *testing.T) {
 		}
 	}
 
-	if !reflect.DeepEqual(versions, []int64{1}) {
-		t.Fatalf("versions = %v, want [1]", versions)
+	if !reflect.DeepEqual(versions, []int64{1, 2}) {
+		t.Fatalf("versions = %v, want [1 2]", versions)
 	}
 }
